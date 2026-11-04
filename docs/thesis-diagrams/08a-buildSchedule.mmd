@@ -1,0 +1,24 @@
+%% Рисунок 5.4, а. Основний алгоритм buildSchedule() (backend/src/scheduling/planner.js)
+flowchart TB
+    B0(["Початок buildSchedule()<br/>виклик з модуля plan: replanToday()"])
+    B1["knownUntil = max(now, початок зміни)"]
+    B2["pool = роботи з r < кінець зміни і r ≤ knownUntil<br/>(решта в план цього дня не потрапляє)"]
+    B5["cursor = max(початок зміни, startAt)<br/>underWay = activeGroup<br/>items = порожній список"]
+    B6{"pool<br/>порожній?"}
+    B7[["step = nextStep(pool, cursor, …)<br/>підпрограма, рисунок 5.4, б"]]
+    B8{"step.dayOver?"}
+    B9{"step.waitUntil?"}
+    B9a["cursor = waitUntil"]
+    B10["додати в items: робота, plannedStart = start,<br/>plannedEnd = end, корінь групи"]
+    B11["прибрати роботу з pool;<br/>cursor = end"]
+    B12["underWay = groupUnderWay(step):<br/>група щойно запланованої роботи"]
+    B14(["Кінець buildSchedule()<br/>повернення items у replanToday();<br/>роботи, що лишились у pool, чекають наступного дня"])
+
+    B0 --> B1 --> B2 --> B5 --> B6
+    B6 -- ні --> B7 --> B8
+    B8 -- так --> B14
+    B8 -- ні --> B9
+    B9 -- так --> B9a --> B6
+    B9 -- ні --> B10 --> B11 --> B12 --> B6
+    B6 -- так --> B14
+    B12 ~~~ B14

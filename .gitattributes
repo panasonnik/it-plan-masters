@@ -1,0 +1,4 @@
+# Experiment files are compared byte for byte (SHA-256 in manifest.json,
+# orgCatalog.test.js): no line-ending conversion on checkout.
+backend/results/** -text
+backend/experiments/*.json text eol=lf

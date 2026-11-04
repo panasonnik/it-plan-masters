@@ -1,0 +1,49 @@
+%% Аркуш 7. Діаграма послідовності POST /api/tickets з автоматичним обчисленням параметрів роботи
+sequenceDiagram
+    autonumber
+    actor U as Працівник<br/>або адміністратор
+    participant FE as NewRequestPage<br/>api.ts api()
+    participant R as tickets.routes<br/>authenticate · createSchema
+    participant S as tickets.service<br/>createTicket()
+    participant TR as tickets.repository
+    participant ER as equipment.repository
+    participant RR as references.repository
+    participant DB as PostgreSQL
+
+    U->>FE: обирає пристрій (адміністратор — будь-який:<br/>«Заявки» → «Подати заявку»), що сталося,<br/>«Надіслати заявку»
+    FE->>R: POST /api/tickets<br/>Authorization: Bearer …<br/>{ equipmentId, symptomId, description? }
+    R->>R: authenticate: перевірити токен (інакше 401)
+    R->>R: createSchema.parse(body) (інакше 422)
+    R->>S: createTicket(req.user, input)
+    S->>TR: findSymptom(symptomId)
+    TR->>DB: SELECT work_type FROM symptoms
+    DB-->>TR: вид робіт
+    Note over S,TR: симптому немає → 422
+    S->>ER: canSee(userId, equipmentId)
+    ER->>DB: піддерево обладнання працівника (tree_path LIKE)
+    Note over S,ER: не своє обладнання → 403<br/>(адміністратора не перевіряють)
+
+    rect rgb(238, 238, 238)
+        Note over S,DB: transaction(): BEGIN … COMMIT, при помилці ROLLBACK
+        S->>RR: normMinutes(equipmentId, work_type)
+        RR->>DB: SELECT NORM_SQL: медіана, якщо sample_count ≥ 5,<br/>інакше seed_minutes
+        DB-->>RR: p
+        Note over S,RR: нормативу немає → 422
+        S->>TR: insertTicket(), insertHistory(NEW)
+        TR->>DB: INSERT INTO tickets, ticket_history
+        S->>ER: peopleCount(equipmentId)
+        ER->>DB: SELECT PEOPLE_SQL:<br/>COALESCE(affected_people, люди піддерева)
+        DB-->>ER: n
+        S->>TR: insertTask(ticketId, equipmentId, work_type, p, n)
+        TR->>DB: INSERT INTO tasks (source 'TICKET',<br/>work_type — зовнішній ключ на work_types,<br/>release_at = now(), status 'NEW')
+        alt уже є відкрита заявка того самого виду робіт на обладнанні
+            DB-->>TR: 23505 uq_tasks_open_ticket, ROLLBACK
+            S-->>FE: 409 «Про цю несправність уже повідомлено —<br/>заявка в роботі» (через errorHandler)
+        else роботу створено
+            S->>DB: COMMIT
+        end
+    end
+
+    S-->>R: ticketId
+    R-->>FE: 201 { ticket_id }
+    FE-->>U: перехід на «Мої заявки»<br/>(адміністратор — на «Заявки»), статус «нова»

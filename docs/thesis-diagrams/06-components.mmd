@@ -1,0 +1,73 @@
+%% Аркуш 6. Діаграма компонентів серверної частини (backend)
+flowchart LR
+    CL(["Клієнт<br/>React SPA, api.ts"])
+
+    subgraph HTTPL["HTTP-рівень: src/app.js, src/auth.js, src/errors.js"]
+        direction TB
+        APP["app.js<br/>cors · express.json ·<br/>маршрутизатори /api/*"]
+        AUTH["auth.js<br/>authenticate: токен → req.user<br/>requireAdmin: роль IT_ADMIN"]
+        NF["app.js: 404<br/>«Маршрут … не існує»"]
+        EH["errors.js: errorHandler<br/>{ error: текст }<br/>401 · 403 · 404 · 409 · 422 · 500"]
+        APP --> AUTH
+        APP --> NF --> EH
+    end
+
+    subgraph JOBS["src/jobs.js — node-cron"]
+        direction TB
+        J1["planned · 0 1 * * *<br/>createPlannedTasks()"]
+        J2["reminders · 0 8 * * *<br/>remindMaintenance()"]
+        J3["plan · щохвилини<br/>planAtShiftStart()"]
+        J1 ~~~ J2 ~~~ J3
+    end
+
+    subgraph MODS["src/modules — у кожному routes · service · repository"]
+        direction TB
+        M1["auth · users"]
+        M2["equipment: дерево, споживачі,<br/>кількість людей"]
+        M3["references: symptoms · norms · rules ·<br/>work-types · work-hours · settings"]
+        M4["tickets · tasks<br/>completeTask() → refreshNormMedian()"]
+        M5["plan: replanToday() · todayView()"]
+        M6["notifications"]
+        M7["reports: втрати Z і простій S"]
+        M1 ~~~ M2 ~~~ M3 ~~~ M4 ~~~ M5 ~~~ M6 ~~~ M7
+    end
+
+    subgraph EXP["src/experiment + scripts"]
+        direction TB
+        X1["scripts/run-experiment.js"]
+        X2["scenario · random · run · experiment ·<br/>statistics · report · charts"]
+        X1 --> X2
+    end
+
+    subgraph CORE["src/scheduling — ядро планування (без Express і бази даних)"]
+        direction TB
+        SI["simulator.js · runHorizon"]
+        PL["planner.js · nextStep · buildSchedule"]
+        RU["rules.js · orderTasks:<br/>FIFO · EDD · WSPT · DYNAMIC_RATIO"]
+        GR["grouping.js<br/>assignMaintenanceGroups · groupUnderWay"]
+        CA["calendar.js<br/>nextWorkingMoment · addWorkingMinutes"]
+        ME["metrics.js · computeMetrics (Z)"]
+        SI --> PL --> RU
+        PL --> GR
+        PL --> CA
+        SI --> ME
+    end
+
+    subgraph DB["src/db.js · src/config.js · src/migrate.js"]
+        direction TB
+        POOL["db.js<br/>pool · query() · transaction()"]
+        MIG["migrate.js<br/>npm run migrate"]
+        CONF["config.js<br/>змінні з .env"]
+        POOL ~~~ MIG ~~~ CONF
+    end
+
+    PG[("PostgreSQL 18")]
+
+    CL == "HTTP /api" ==> HTTPL
+    HTTPL == "запит з req.user;<br/>помилки → errorHandler" ==> MODS
+    JOBS -- "planAtShiftStart →<br/>plan.replanToday()" --> MODS
+    MODS == "buildSchedule (plan),<br/>computeMetrics (reports)" ==> CORE
+    EXP == "runHorizon → nextStep" ==> CORE
+    MODS == "репозиторії: SQL" ==> DB
+    JOBS -- "query(): SQL" --> DB
+    DB == "SQL (pg)" ==> PG

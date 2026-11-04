@@ -1,0 +1,51 @@
+%% Аркуш 4. Діаграма станів заявки (tickets.status) і роботи (tasks.status); стану обладнання в схемі немає
+stateDiagram-v2
+    direction LR
+
+    state "Заявка — tickets.status" as TICKET {
+        direction LR
+        [*] --> T_NEW : POST /api/tickets
+        T_NEW --> T_SCHEDULED : внесено в план
+        T_SCHEDULED --> T_NEW : сьогодні не вміщується
+        T_NEW --> T_IN_PROGRESS : «Почати»
+        T_SCHEDULED --> T_IN_PROGRESS : «Почати»
+        T_IN_PROGRESS --> T_DONE : «Готово»
+        T_NEW --> T_REJECTED : «Відхилити»
+        T_SCHEDULED --> T_REJECTED : «Відхилити»
+        T_DONE --> [*]
+        T_REJECTED --> [*]
+        state "NEW (нова)" as T_NEW
+        state "SCHEDULED (запланована)" as T_SCHEDULED
+        state "IN_PROGRESS (виконується)" as T_IN_PROGRESS
+        state "DONE (виконана)" as T_DONE
+        state "REJECTED (відхилена)" as T_REJECTED
+        note right of T_IN_PROGRESS
+            статус заявки йде за статусом її роботи (syncTicket);
+            кожна зміна — запис у ticket_history
+            і сповіщення автору
+        end note
+    }
+
+    state "Робота — tasks.status" as TASK {
+        direction LR
+        [*] --> K_NEW : створено із заявки<br/>або createPlannedTasks (01:00)
+        K_NEW --> K_SCHEDULED : replanToday(): у плані
+        K_SCHEDULED --> K_NEW : replanToday(): не вміщується
+        K_NEW --> K_IN_PROGRESS : «Почати»
+        K_SCHEDULED --> K_IN_PROGRESS : «Почати»
+        K_IN_PROGRESS --> K_DONE : «Готово», actual_minutes > 0,<br/>refreshNormMedian()
+        K_NEW --> K_CANCELLED : заявку відхилено
+        K_SCHEDULED --> K_CANCELLED : заявку відхилено
+        K_DONE --> [*]
+        K_CANCELLED --> [*]
+        state "NEW (нова)" as K_NEW
+        state "SCHEDULED (запланована)" as K_SCHEDULED
+        state "IN_PROGRESS (виконується)" as K_IN_PROGRESS
+        state "DONE (виконана)" as K_DONE
+        state "CANCELLED (скасована)" as K_CANCELLED
+        note right of K_SCHEDULED
+            у NEW і SCHEDULED адміністратор може виправити
+            вид робіт і n (PATCH /api/tasks/:id), статус не змінюється;
+            IN_PROGRESS — щонайбільше одна робота (uq_tasks_one_in_progress)
+        end note
+    }

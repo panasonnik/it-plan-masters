@@ -1,0 +1,109 @@
+@startuml 03-activity
+' Аркуш 3. Діаграма діяльності: від подання заявки до завершення роботи
+' і перерахунку нормативу в completeTask()
+skinparam defaultFontName Arial
+skinparam defaultFontSize 22
+skinparam swimlaneTitleFontSize 24
+skinparam shadowing false
+skinparam ActivityBorderColor #222222
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityDiamondBorderColor #222222
+skinparam ActivityDiamondBackgroundColor #FFFFFF
+skinparam ArrowColor #222222
+skinparam SwimlaneBorderColor #555555
+skinparam SwimlaneWidth same
+
+|Працівник|
+start
+:Відкрити «Моє обладнання»,
+обрати пристрій;
+note right
+  адміністратор: «Заявки» →
+  «Подати заявку» → будь-який
+  пристрій у дереві обладнання
+end note
+:Обрати, що сталося (симптом),
+опис — необов'язково;
+:«Надіслати заявку»
+(POST /api/tickets);
+
+|Сервер|
+if (Токен і createSchema (zod) правильні?) then (ні)
+  :401 / 422;
+  stop
+endif
+if (Симптом існує і пристрій у піддереві
+обладнання працівника (canSee)?
+Адміністратора не перевіряють) then (ні)
+  :422 / 403;
+  stop
+endif
+:Транзакція: p = normMinutes() (NORM_SQL),
+вид робіт симптому — з довідника work_types,
+заявка NEW, запис у ticket_history,
+n = peopleCount() (PEOPLE_SQL),
+робота NEW, r = now();
+if (Уже є відкрита заявка того самого виду робіт
+на цьому обладнанні (uq_tasks_open_ticket)?) then (так)
+  :ROLLBACK, 409 «Про цю несправність
+  уже повідомлено»;
+  stop
+endif
+:201 { ticket_id };
+
+|Система|
+:planAtShiftStart (щохвилини): почалася зміна →
+replanToday() за правилом ALGORITHM
+(або «Скласти план зараз», POST /api/plan);
+:Роботи в плані: NEW → SCHEDULED,
+що не вміщуються: SCHEDULED → NEW;
+
+|ІТ-адміністратор|
+if (Заявку треба відхилити?) then (так)
+  :«Відхилити» з причиною
+  (POST /api/tickets/:id/reject);
+  |Сервер|
+  :Заявка REJECTED, робота CANCELLED,
+  позицію плану видалено,
+  сповіщення автору;
+  stop
+endif
+|ІТ-адміністратор|
+if (Вид робіт або n неправильні?) then (так)
+  :«Виправити»: PATCH /api/tasks/:id
+  (p — з нормативу нового виду робіт),
+  replanToday();
+endif
+:«Почати» (POST /api/tasks/:id/start);
+
+|Сервер|
+:Робота і заявка IN_PROGRESS, started_at,
+ticket_history, сповіщення автору,
+replanToday();
+
+|ІТ-адміністратор|
+:Виконати роботу;
+:«Готово» + фактичні хвилини
+(POST /api/tasks/:id/complete);
+
+|Сервер|
+:Транзакція completeTask():
+робота DONE, actual_minutes;
+:refreshNormMedian(): медіана actual_minutes
+для пари (тип обладнання, вид робіт),
+sample_count;
+note right
+  нові роботи отримують медіану,
+  якщо sample_count ≥ NORM_MIN_SAMPLES (5),
+  інакше seed_minutes
+end note
+if (Планова робота?) then (так)
+  :next_due_date = сьогодні + period_days;
+else (ні)
+  :Заявка DONE, ticket_history,
+  сповіщення автору;
+endif
+:replanToday(): решта плану
+від поточного моменту;
+stop
+@enduml

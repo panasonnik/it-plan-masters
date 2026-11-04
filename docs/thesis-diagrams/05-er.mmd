@@ -1,0 +1,131 @@
+%% Аркуш 5. ER-діаграма бази даних: 15 таблиць з міграцій 001–003 і службова таблиця migrations
+%% У кожній таблиці — PK, FK і 2–3 головні поля; усі колонки — docs/thesis-appendix/01-er-diagram.md
+%% Підписи зв'язків порожні: Mermaid пише їх дрібним шрифтом 14 px, а назву FK видно в таблиці
+%%{init: {"themeVariables": {"fontSize": "48px"}}}%%
+erDiagram
+    direction TB
+    users {
+        int user_id PK
+        text email
+        text role
+        bool is_active
+    }
+    equipment_types {
+        int equipment_type_id PK
+        text code
+        text category
+    }
+    equipment {
+        int equipment_id PK
+        int equipment_type_id FK
+        int parent_equipment_id FK
+        int assigned_user_id FK
+        text tree_path
+        int affected_people
+    }
+    equipment_consumers {
+        int equipment_id PK, FK
+        int user_id PK, FK
+    }
+    work_types {
+        text work_type PK
+        text name
+    }
+    symptoms {
+        int symptom_id PK
+        int equipment_type_id FK
+        text work_type FK
+        text label
+    }
+    service_norms {
+        int service_norm_id PK
+        int equipment_type_id FK
+        text work_type FK
+        int seed_minutes
+        int observed_median_minutes
+        int sample_count
+    }
+    maintenance_rules {
+        int maintenance_rule_id PK
+        int equipment_id FK
+        text work_type FK
+        int period_days
+        int tolerance_days
+        date next_due_date
+    }
+    tickets {
+        int ticket_id PK
+        int reported_by_user_id FK
+        int equipment_id FK
+        int symptom_id FK
+        text status
+    }
+    ticket_history {
+        int ticket_history_id PK
+        int ticket_id FK
+        text status
+        timestamptz changed_at
+    }
+    tasks {
+        int task_id PK
+        int ticket_id FK
+        int maintenance_rule_id FK
+        int equipment_id FK
+        text work_type FK
+        int estimated_minutes "p"
+        int people_count "n"
+        timestamptz release_at "r"
+        timestamptz due_at "d"
+        text status
+    }
+    plan_items {
+        int task_id PK, FK
+        int group_root_equipment_id FK
+        int position
+        timestamptz planned_start_at
+    }
+    notifications {
+        int notification_id PK
+        int user_id FK
+        int task_id FK
+        text type
+        bool is_read
+    }
+
+    work_types ||--o{ symptoms : ""
+    work_types ||--o{ service_norms : ""
+    work_types ||--o{ maintenance_rules : ""
+    work_types ||--o{ tasks : ""
+    users |o--o{ equipment : ""
+    users ||--o{ equipment_consumers : ""
+    users ||--o{ tickets : ""
+    users ||--o{ notifications : ""
+    equipment_types ||--o{ equipment : ""
+    equipment_types |o--o{ symptoms : ""
+    equipment_types ||--o{ service_norms : ""
+    equipment |o--o{ equipment : ""
+    equipment ||--o{ equipment_consumers : ""
+    equipment ||--o{ maintenance_rules : ""
+    equipment ||--o{ tickets : ""
+    equipment ||--o{ tasks : ""
+    equipment |o--o{ plan_items : ""
+    symptoms ||--o{ tickets : ""
+    tickets ||--o{ ticket_history : ""
+    tickets |o--o{ tasks : ""
+    maintenance_rules |o--o{ tasks : ""
+    tasks ||--o| plan_items : ""
+    tasks |o--o{ notifications : ""
+    work_hours {
+        int day_of_week PK
+        time start_time
+        time end_time
+        time break_start
+    }
+    settings {
+        text setting_key PK
+        text setting_value
+    }
+    migrations {
+        text filename PK
+        timestamptz applied_at
+    }

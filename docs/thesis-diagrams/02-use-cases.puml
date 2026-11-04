@@ -1,0 +1,57 @@
+@startuml 02-use-cases
+' Аркуш 2. Діаграма варіантів використання; номери ВВ-1…ВВ-11 — як у розділі 3 записки
+left to right direction
+skinparam defaultFontName Arial
+skinparam defaultFontSize 22
+skinparam actorFontSize 24
+skinparam usecaseFontSize 21
+skinparam packageFontSize 24
+skinparam shadowing false
+skinparam usecaseBorderColor #222222
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam actorBorderColor #222222
+skinparam ArrowColor #222222
+skinparam packageStyle rectangle
+skinparam nodesep 30
+skinparam ranksep 60
+
+actor "Працівник\n(EMPLOYEE)" as EMP
+actor "ІТ-адміністратор\n(IT_ADMIN)" as ADM
+actor "Система\n(сервер і фонові задачі)" as SYS
+
+rectangle "ІС управління ІТ-активами" {
+  usecase "ВВ-1 Реєстрація, вхід до системи\nі вихід з неї\n/api/auth/*" as UC1
+  usecase "ВВ-2 Перегляд свого обладнання\nGET /api/equipment/my" as UC2
+  usecase "ВВ-3 Подання заявки\nпро несправність\n(адміністратор — на будь-яке обладнання)\nPOST /api/tickets" as UC3
+  usecase "ВВ-4 Перегляд своїх заявок\nі їхніх статусів\nGET /api/tickets/my" as UC4
+  usecase "ВВ-5 Ведення довідників (обладнання,\nсимптоми, нормативи, регламенти, види робіт)\nі налаштувань\n/api/equipment, /api/references/*,\n/api/references/work-types, /api/users" as UC5
+  usecase "ВВ-6 Розгляд, виправлення\nі відхилення заявки\nPATCH /api/tasks/:id,\nPOST /api/tickets/:id/reject" as UC6
+  usecase "ВВ-7 Формування і перегляд\nплану на сьогодні\nGET, POST /api/plan;\nна початку зміни — фонова задача" as UC7
+  usecase "ВВ-8 Виконання роботи —\nпочаток і завершення\nPOST /api/tasks/:id/start, /complete" as UC8
+  usecase "ВВ-9 Створення планових робіт\nза регламентами\ncreatePlannedTasks, 01:00" as UC9
+  usecase "ВВ-10 Уточнення нормативу тривалості:\nмедіана пари «тип обладнання, вид робіт»\nпісля «Готово», refreshNormMedian" as UC10
+  usecase "ВВ-11 Проведення імітаційного\nексперименту і вибір\nправила черговості\nnpm run experiment; PUT /api/plan/rule" as UC11
+
+  usecase "Обчислити вид робіт, p і n\n(NORM_SQL, PEOPLE_SQL)" as CALC
+}
+
+EMP --> UC1
+EMP --> UC2
+EMP --> UC3
+EMP --> UC4
+
+ADM --> UC1
+ADM --> UC3
+ADM --> UC5
+ADM --> UC6
+ADM --> UC7
+ADM --> UC8
+ADM --> UC11
+
+UC3 ..> CALC : <<include>>
+UC8 ..> UC10 : <<include>>
+
+UC7 <-- SYS
+UC9 <-- SYS
+UC11 <-- SYS
+@enduml

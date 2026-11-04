@@ -1,0 +1,21 @@
+%% Рисунок 5.9. Шлях запиту через шари модуля серверної частини (з обробником помилок)
+flowchart TB
+    CL(["Клієнт — api.ts: api()"])
+    APP["app.js: cors · express.json ·<br/>маршрутизатор модуля /api/#lt;модуль#gt;"]
+    AU["authenticate (auth.js):<br/>перевірка токена"]
+    RR["requireAdmin (auth.js): роль IT_ADMIN<br/>(лише для дій адміністратора)"]
+    RT["#lt;модуль#gt;.routes.js: схема zod,<br/>виклик сервісу, JSON-відповідь"]
+    SV["#lt;модуль#gt;.service.js: бізнес-правила,<br/>transaction(), перерахунок плану"]
+    RP["#lt;модуль#gt;.repository.js: SQL-запити (pg),<br/>одна функція — один запит"]
+    PG[("PostgreSQL:<br/>ключі, обмеження, індекси")]
+    EH["errors.js: errorHandler<br/>{ error: текст для людини }<br/>401 · 403 · 404 · 409 · 422 · 500"]
+
+    CL -- "HTTP + JSON" --> APP --> AU --> RR --> RT --> SV --> RP --> PG
+    RT -. "200 / 201 + JSON" .-> CL
+    APP -. "404: маршрут не існує" .-> EH
+    AU -. "401" .-> EH
+    RR -. "403" .-> EH
+    RT -. "ZodError → 422" .-> EH
+    SV -. "httpError:<br/>403 · 404 · 409 · 422" .-> EH
+    PG -. "23505 → 409; 23503: немає в довіднику → 422,<br/>запис використовується → 409; ROLLBACK" .-> EH
+    EH -. "відповідь з помилкою" .-> CL

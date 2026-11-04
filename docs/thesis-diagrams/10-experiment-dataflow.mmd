@@ -1,0 +1,25 @@
+%% Рисунок 5.11. Потоки даних підсистеми імітаційного експерименту (backend/src/experiment)
+flowchart TB
+    CFG[/"experiments/thesis.json<br/>+ --epsilon --confidence --levels"/]
+    CAT[/"catalog-org.json: 60 працівників,<br/>308 одиниць, 147 регламентів"/]
+    CLI["scripts/run-experiment.js — readConfig(),<br/>запуск і запис результатів"]
+    RND["random.js — Парк – Міллер:<br/>прогін i бере i-й шматок послідовності"]
+    SCN["scenario.js — buildScenario(): 20 робочих днів,<br/>головний список заявок (p, n), планові роботи,<br/>рівні ρ → кількість заявок K"]
+    EXP["experiment.js — runExperiment():<br/>пілот n₀ = 50 → N на рівень →<br/>основна серія → серія збіжності"]
+    TF["scenario.js — tasksFor(): моменти надходження r<br/>перших K заявок + планові роботи"]
+    RUN["run.js — runSeed() → measure():<br/>simulator.js runHorizon → nextStep,<br/>період + дороблювання до останньої роботи"]
+    STAT["statistics.js — Z̄, s,<br/>N = max(n₀, ⌈(z·s/ε)²⌉), Z̄ ± z·s/√N"]
+    REP["report.js — runs.csv, summary.csv, tables.md<br/>charts.js — графіки SVG, PNG"]
+    OUT[/"results/thesis: config.json · runs.csv ·<br/>summary.csv · tables.md ·<br/>z-mean.svg/png · convergence.svg/png"/]
+
+    CFG --> CLI
+    CAT --> CLI
+    CLI --> SCN
+    RND --> SCN
+    SCN --> EXP
+    EXP -- "рівень, номер прогону" --> RUN
+    RND --> TF
+    TF --> RUN
+    RUN -- "Z, Z_позапл, Z_план, S, U" --> EXP
+    EXP <-- "Z̄, s, N, інтервали" --> STAT
+    EXP -- "прогони і підсумки" --> REP --> OUT

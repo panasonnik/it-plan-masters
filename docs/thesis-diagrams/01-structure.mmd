@@ -1,0 +1,44 @@
+%% Аркуш 1. Структурна схема системи
+flowchart TB
+    subgraph CLIENT["Клієнтська частина — браузер"]
+        direction LR
+        EMP(["Працівник<br/>EMPLOYEE"])
+        ADM(["ІТ-адміністратор<br/>IT_ADMIN"])
+        SPA["React SPA (frontend/src)<br/>App.tsx: сторінки за роллю · pages/"]
+        REQ["api.ts: api()<br/>токен у заголовку Authorization"]
+        LS[("localStorage token:<br/>токен входу на 8 годин")]
+        EMP --> SPA
+        ADM --> SPA
+        SPA --> REQ
+        REQ <--> LS
+    end
+
+    subgraph SERVER["Серверна частина — Node.js 20 + Express 5 (backend), REST API /api"]
+        direction LR
+        HTTP["app.js · auth.js · errors.js<br/>cors · express.json · authenticate ·<br/>requireAdmin · errorHandler"]
+        MOD["Модулі src/modules:<br/>routes → service → repository"]
+        CORE["Ядро планування src/scheduling<br/>planner · rules · grouping ·<br/>calendar · metrics · simulator"]
+        JOBS["Фонові задачі src/jobs.js (node-cron)<br/>01:00 planned · 08:00 reminders ·<br/>planAtShiftStart на початку зміни"]
+        DBL["db.js: pool (pg) · query() · transaction()<br/>migrate.js"]
+        HTTP --> MOD --> CORE
+        JOBS --> MOD
+        MOD --> DBL
+        JOBS --> DBL
+    end
+
+    subgraph DATA["База даних PostgreSQL 18"]
+        TBL[("15 таблиць + migrations: users · equipment ·<br/>tickets · tasks · plan_items · work_types · …<br/>ключі, обмеження й індекси, без тригерів і функцій")]
+    end
+
+    subgraph EXP["Підсистема експерименту — без бази даних"]
+        direction LR
+        CFG[/"experiments/thesis.json<br/>catalog-org.json"/]
+        CLI["scripts/run-experiment.js<br/>npm run experiment"]
+        EXPM["src/experiment: scenario · random · run ·<br/>experiment · statistics · report · charts"]
+        RES[/"results/thesis: config.json · runs.csv ·<br/>summary.csv · tables.md ·<br/>z-mean, convergence (PNG, SVG)"/]
+        CFG --> CLI --> EXPM --> RES
+    end
+
+    CLIENT == "HTTP + JSON" ==> SERVER
+    SERVER == "SQL (pg)" ==> DATA
+    EXP -. "той самий код ядра:<br/>runHorizon → nextStep" .-> SERVER
