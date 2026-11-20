@@ -69,6 +69,68 @@ export function RuleName({ rule }: { rule: Rule }) {
   );
 }
 
+interface TreeNode {
+  item: Equipment;
+  children: TreeNode[];
+}
+
+interface TreeGroup {
+  key: string;
+  name: string;
+  nodes: TreeNode[];
+  count: number;
+}
+
+const NO_DEPARTMENT = 'Без підрозділу';
+
+//підрозділ → кореневе обладнання → діти → онуки; корінь — вузол, чийого батька немає в списку
+function buildGroups(items: Equipment[]): TreeGroup[] {
+  const nodes = new Map(items.map((item) => [item.equipment_id, { item, children: [] } as TreeNode]));
+  const roots: TreeNode[] = [];
+  for (const node of nodes.values()) {
+    const parent = node.item.parent_equipment_id === null ? undefined : nodes.get(node.item.parent_equipment_id);
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+
+  const size = (node: TreeNode): number => 1 + node.children.reduce((sum, child) => sum + size(child), 0);
+  const groups = new Map<string, TreeGroup>();
+  for (const root of roots) {
+    const key = String(root.item.root_department_id ?? 'none');
+    const group = groups.get(key) ?? { key, name: root.item.department_name ?? NO_DEPARTMENT, nodes: [], count: 0 };
+    group.nodes.push(root);
+    group.count += size(root);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].sort((a, b) =>
+    a.key === 'none' ? 1 : b.key === 'none' ? -1 : a.name.localeCompare(b.name, 'uk')
+  );
+}
+
+function units(count: number): string {
+  const last = count % 10;
+  const teen = count % 100 >= 11 && count % 100 <= 14;
+  if (last === 1 && !teen) return `${count} одиниця`;
+  if (last >= 2 && last <= 4 && !teen) return `${count} одиниці`;
+  return `${count} одиниць`;
+}
+
+function TreeToggle({ open, label, onToggle }: { open: boolean; label: string; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className="eq-toggle"
+      aria-expanded={open}
+      aria-label={`${open ? 'Згорнути' : 'Розгорнути'}: ${label}`}
+      title={open ? 'Згорнути' : 'Розгорнути'}
+      onClick={onToggle}
+    >
+      {open ? '−' : '+'}
+    </button>
+  );
+}
+
 export function EquipmentTree({
   items,
   selectedId,
@@ -78,22 +140,69 @@ export function EquipmentTree({
   selectedId?: number | null;
   onSelect?: (item: Equipment) => void;
 }) {
+  //за замовчуванням усе розгорнуто
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
   if (items.length === 0) return <p className="empty">Обладнання немає.</p>;
 
+  const toggle = (key: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
+  function renderNode(node: TreeNode) {
+    const { item } = node;
+    const key = `e${item.equipment_id}`;
+    const open = !collapsed.has(key);
+    const content = (
+      <>
+        <span className="eq-name">{item.name}</span>
+        <span className="eq-type">{item.type_name}</span>
+        <span className="eq-inv">
+          інв. <span className="eq-inv-number">{item.inventory_number}</span>
+        </span>
+      </>
+    );
+
+    return (
+      <li key={item.equipment_id} className="eq-node">
+        <div className={`eq-row${item.equipment_id === selectedId ? ' eq-row-selected' : ''}`}>
+          {node.children.length > 0 ? (
+            <TreeToggle open={open} label={item.name} onToggle={() => toggle(key)} />
+          ) : (
+            <span className="eq-toggle-space" />
+          )}
+          {onSelect ? (
+            <button type="button" className="eq-label" onClick={() => onSelect(item)}>
+              {content}
+            </button>
+          ) : (
+            <span className="eq-label">{content}</span>
+          )}
+        </div>
+        {node.children.length > 0 && open && <ul className="eq-branch">{node.children.map(renderNode)}</ul>}
+      </li>
+    );
+  }
+
   return (
-    <ul className="tree">
-      {items.map((item) => (
-        <li
-          key={item.equipment_id}
-          className={`tree-row${item.equipment_id === selectedId ? ' tree-row-selected' : ''}`}
-          style={{ paddingLeft: (item.tree_path.split('.').length - 3) * 24 + 8 }}
-          onClick={onSelect ? () => onSelect(item) : undefined}
-        >
-          <span className="tree-name">{item.name}</span>
-          <span className="sticker">{item.inventory_number}</span>
-          <span className="tree-extra">{item.type_name}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="eq-tree">
+      {buildGroups(items).map((group) => {
+        const key = `d${group.key}`;
+        const open = !collapsed.has(key);
+        return (
+          <section key={key} className="eq-group">
+            <div className="eq-group-head">
+              <TreeToggle open={open} label={group.name} onToggle={() => toggle(key)} />
+              <span className="eq-group-name">{group.name}</span>
+              <span className="eq-count">{units(group.count)}</span>
+            </div>
+            {open && <ul className="eq-branch eq-branch-top">{group.nodes.map(renderNode)}</ul>}
+          </section>
+        );
+      })}
+    </div>
   );
 }

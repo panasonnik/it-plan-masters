@@ -6,7 +6,7 @@ process.env.JWT_SECRET = 'test-secret-for-correction-tests';
 
 const mockState = { task: null, updates: [], replanned: 0 };
 
-//для SOFTWARE нормативу немає
+//для DEFRAG нормативу немає (дефрагментують лише HDD)
 const MOCK_NORMS = { REPAIR: 45, REPLACEMENT: 15 };
 
 async function mockDb(sql, params = []) {
@@ -83,7 +83,7 @@ test('розпочату роботу виправити не можна — п�
 test('вид робіт без нормативу — 422 з поясненням, нічого не змінено', async () => {
   mockState.task = { task_id: 7, status: 'NEW', equipment_id: 14, work_type: 'REPAIR' };
 
-  const res = await correct({ workType: 'SOFTWARE', peopleCount: 1 });
+  const res = await correct({ workType: 'DEFRAG', peopleCount: 1 });
 
   expect(res.status).toBe(422);
   expect((await res.json()).error).toBe('Для цього виду робіт немає нормативу тривалості');

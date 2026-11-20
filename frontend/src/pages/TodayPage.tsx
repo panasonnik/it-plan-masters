@@ -51,14 +51,18 @@ export default function TodayPage() {
 
           <h3 className="panel-title">Далі сьогодні</h3>
           {data.next.length === 0 && <p className="empty">У плані на сьогодні більше нічого немає.</p>}
-          {data.next.map((work, index) => (
-            <div key={work.task_id}>
-              {work.group_root_equipment_id && work.group_root_equipment_id !== data.next[index - 1]?.group_root_equipment_id && (
-                <p className="group-caption">Група робіт: {work.group_root_name} — робиться за один візит</p>
-              )}
-              <WorkCard work={work} onAct={act} />
-            </div>
-          ))}
+          {groupRuns(data.next).map((run) =>
+            run[0].group_root_equipment_id ? (
+              <div key={run[0].task_id} className="work-group">
+                <p className="group-caption">Група робіт: {run[0].group_root_name} — робиться за один візит</p>
+                {run.map((work) => (
+                  <WorkCard key={work.task_id} work={work} onAct={act} />
+                ))}
+              </div>
+            ) : (
+              <WorkCard key={run[0].task_id} work={run[0]} onAct={act} />
+            )
+          )}
 
           <h3 className="panel-title">Чекають (сьогодні не вміщуються або надійшли після складання плану)</h3>
           {data.waiting.length === 0 && <p className="empty">Нічого не чекає.</p>}
@@ -79,6 +83,20 @@ export default function TodayPage() {
   );
 }
 
+//роботи однієї групи, що стоять поспіль
+function groupRuns(works: Work[]): Work[][] {
+  const runs: Work[][] = [];
+
+  for (const work of works) {
+    const last = runs[runs.length - 1];
+    const root = work.group_root_equipment_id;
+    if (root && last && last[0].group_root_equipment_id === root) last.push(work);
+    else runs.push([work]);
+  }
+
+  return runs;
+}
+
 function describe(work: Work): string {
   const what = work.symptom_label ? `${work.work_type_name}: ${work.symptom_label}` : work.work_type_name;
   return `${what} · ${work.equipment_name}`;
@@ -89,7 +107,7 @@ function WorkInfo({ work }: { work: Work }) {
     <>
       <p className="work-what">
         <span className={`tag ${work.source === 'TICKET' ? 'tag-ticket' : 'tag-planned'}`}>
-          {work.source === 'TICKET' ? `Заявка №${work.ticket_id}` : 'Планове обслуговування'}
+          {work.source === 'TICKET' ? `Заявка №${work.ticket_id}` : 'За графіком планових робіт'}
         </span>{' '}
         {describe(work)} <span className="sticker">{work.inventory_number}</span>
       </p>

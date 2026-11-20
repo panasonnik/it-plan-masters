@@ -15,7 +15,7 @@ async function setTicketStatus(db, ticketId, status, comment) {
   if (!ticket) return;
 
   await repo.insertHistory(db, ticketId, status, comment);
-  await notificationsRepo.insertNotification(db, ticket.reported_by_user_id, 'TICKET', `Заявка №${ticketId}: ${STATUS_WORDS[status]}`, comment);
+  await notificationsRepo.notifyTicketUsers(db, ticketId, 'TICKET', `Заявка №${ticketId}: ${STATUS_WORDS[status]}`, comment);
 }
 
 //статус заявки за статусом роботи
@@ -29,7 +29,7 @@ async function createTicket(user, input) {
   if (!symptom) throw httpError(422, 'Симптом не знайдено');
 
   if (user.role !== 'IT_ADMIN' && !(await equipmentRepo.canSee(query, user.userId, input.equipmentId))) {
-    throw httpError(403, 'Це обладнання не закріплене за вами');
+    throw httpError(403, 'Ви не користуєтесь цим обладнанням — заявку на нього подати не можна');
   }
 
   try {
@@ -41,6 +41,11 @@ async function createTicket(user, input) {
       await repo.insertHistory(db, ticketId, 'NEW', 'Заявку створено');
       const people = await equipmentRepo.peopleCount(db, input.equipmentId);
       await repo.insertTask(db, ticketId, input.equipmentId, symptom.work_type, minutes, people);
+
+      const what = input.description ? `${symptom.label} — «${input.description}»` : symptom.label;
+      await notificationsRepo.logTicketEvent(db, ticketId, 'TICKET_CREATED', 'Нова заявка', what);
+      //заявку на закріплений пристрій міг подати адміністратор
+      await notificationsRepo.notifyTicketUsers(db, ticketId, 'TICKET', `Заявка №${ticketId}: ${STATUS_WORDS.NEW}`, what, user.userId);
       return ticketId;
     });
   } catch (err) {
@@ -68,6 +73,7 @@ async function rejectTicket(ticketId, reason) {
     await repo.cancelTask(db, ticketId);
     await repo.deletePlanItems(db, ticketId);
     await setTicketStatus(db, ticketId, 'REJECTED', reason);
+    await notificationsRepo.logTicketEvent(db, ticketId, 'TICKET_REJECTED', 'Заявку відхилено', reason);
   });
 }
 

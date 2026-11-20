@@ -4,6 +4,7 @@ const { transaction } = require('../../db');
 const { httpError } = require('../../errors');
 const repo = require('./tasks.repository');
 const referencesRepo = require('../references/references.repository');
+const notificationsRepo = require('../notifications/notifications.repository');
 const { syncTicket } = require('../tickets/tickets.service');
 const { replanToday, todayView } = require('../plan/plan.service');
 
@@ -23,6 +24,7 @@ async function correctTask(taskId, input) {
     if (minutes === null) throw httpError(422, 'Для цього виду робіт немає нормативу тривалості');
 
     await repo.updateCorrection(db, task.task_id, input.workType, minutes, input.peopleCount);
+    await notificationsRepo.logTaskEvent(db, [task.task_id], 'TASK_CORRECTED', 'Роботу виправлено', `${minutes} хв, людей: ${input.peopleCount}`);
   });
 
   await replanToday();
@@ -37,6 +39,7 @@ async function startTask(taskId) {
 
     await repo.markStarted(db, task.task_id);
     await syncTicket(db, task.task_id, 'Адміністратор розпочав роботу');
+    await notificationsRepo.logTaskEvent(db, [task.task_id], 'TASK_STARTED', 'Роботу розпочато');
   });
 
   await replanToday();
@@ -53,6 +56,7 @@ async function completeTask(taskId, actualMinutes) {
     await referencesRepo.refreshNormMedian(db, task.equipment_id, task.work_type);
     if (task.maintenance_rule_id) await repo.moveRuleDate(db, task.maintenance_rule_id);
     await syncTicket(db, task.task_id, `Виконано за ${actualMinutes} хв`);
+    await notificationsRepo.logTaskEvent(db, [task.task_id], 'TASK_DONE', 'Роботу завершено', `виконано за ${actualMinutes} хв`);
   });
 
   await replanToday();

@@ -37,7 +37,8 @@ CREATE TABLE equipment (
     CONSTRAINT fk_equipment_type FOREIGN KEY (equipment_type_id) REFERENCES equipment_types (equipment_type_id),
     CONSTRAINT fk_equipment_parent FOREIGN KEY (parent_equipment_id) REFERENCES equipment (equipment_id),
     CONSTRAINT fk_equipment_assigned_user FOREIGN KEY (assigned_user_id) REFERENCES users (user_id),
-    CONSTRAINT ck_equipment_affected_people CHECK (affected_people > 0)
+    CONSTRAINT ck_equipment_affected_people CHECK (affected_people > 0),
+    CONSTRAINT ck_equipment_inventory_number CHECK (inventory_number ~ '^[0-9]+$')
 );
 
 CREATE INDEX ix_equipment_path ON equipment (tree_path text_pattern_ops);
@@ -76,7 +77,7 @@ CREATE TABLE service_norms (
 CREATE TABLE maintenance_rules (
     maintenance_rule_id serial  NOT NULL,
     equipment_id        integer NOT NULL,
-    work_type           text    NOT NULL DEFAULT 'MAINTENANCE',
+    work_type           text    NOT NULL,
     period_days         integer NOT NULL,
     tolerance_days      integer NOT NULL DEFAULT 7,
     next_due_date       date    NOT NULL,

@@ -4,11 +4,9 @@ dist/
 build/
 coverage/
 *.log
-# Output of scripts/run-experiment.js. Only the thesis results are kept,
-# without runs.csv (~8 MB; npm run experiment rebuilds it).
-backend/results/*
-!backend/results/thesis/
-backend/results/thesis/runs.csv
+
+# Output of npm run experiment (rebuilt on every run)
+backend/results/
 
 # Output of npm run db:backup
 backend/backups/

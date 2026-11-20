@@ -6,6 +6,7 @@
   --paper: #f3f6f8;
   --surface: #ffffff;
   --line: #dde3e8;
+  --tree-line: #b7c2cc;
   --primary: #17616e;
   --primary-hover: #114b55;
   --primary-soft: #e3f0f1;
@@ -64,8 +65,7 @@ a,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
-.tree-row:focus-visible {
+textarea:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -198,6 +198,12 @@ textarea {
   font: inherit;
 }
 
+input[readonly] {
+  background: var(--paper);
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+
 label {
   display: flex;
   flex-direction: column;
@@ -276,11 +282,19 @@ label {
   font-weight: 600;
 }
 
+.work-group {
+  margin: 16px 0 12px;
+  padding: 10px 12px 0;
+  border: 1px solid var(--amber);
+  border-left-width: 4px;
+  border-radius: var(--radius-card);
+  background: var(--status-progress-bg);
+}
+
 .group-caption {
-  margin: 16px 0 6px;
-  padding-left: 10px;
-  border-left: 4px solid var(--amber);
+  margin: 0 0 10px;
   color: var(--ink-muted);
+  font-weight: 600;
 }
 
 .history {
@@ -361,40 +375,164 @@ label {
   font-weight: 500;
 }
 
-.tree {
+/* дерево обладнання: підрозділ → корінь → діти → онуки */
+.eq-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin: 12px 0;
-  padding: 0;
-  list-style: none;
+}
+
+.eq-group {
+  padding: 4px 12px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   background: var(--surface);
 }
 
-.tree-row {
+.eq-group-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
+  min-height: 44px;
+}
+
+.eq-group-head .eq-toggle {
+  margin-top: 0;
+}
+
+.eq-group-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.eq-count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+/* лінії: кожен вузол малює свій відрізок вертикалі та «коліно» до рядка */
+.eq-branch {
+  margin: 0;
+  padding: 0 0 0 12px;
+  list-style: none;
+}
+
+.eq-node {
+  position: relative;
+  padding-left: 20px;
+}
+
+.eq-node::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 1px solid var(--tree-line);
+}
+
+.eq-node:last-child::before {
+  bottom: auto;
+  height: 22px;
+}
+
+.eq-node::after {
+  content: '';
+  position: absolute;
+  top: 22px;
+  left: 0;
+  width: 16px;
+  border-top: 1px solid var(--tree-line);
+}
+
+.eq-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 44px;
+}
+
+/* центр кнопки на висоті «коліна» (22px), навіть коли підпис переноситься */
+.eq-toggle,
+.eq-toggle-space {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 10px;
+}
+
+.eq-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
 }
 
-.tree-row:hover {
+.eq-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.eq-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
+  padding: 10px 10px 8px;
+  border: 0;
+  border-radius: var(--radius-field);
+  line-height: 24px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.eq-label {
+  cursor: pointer;
+}
+
+button.eq-label:hover {
   background: var(--paper);
 }
 
-.tree-row-selected {
+.eq-row-selected .eq-label {
   background: var(--primary-soft);
 }
 
-.tree-name {
+.eq-name {
   font-weight: 500;
 }
 
-.tree-extra {
+.eq-type {
+  padding: 0 6px;
+  border-radius: var(--radius-sticker);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.eq-inv {
   color: var(--ink-muted);
-  font-size: var(--text-sm);
+  font-size: 12px;
+}
+
+.eq-inv-number {
+  font-family: var(--font-mono);
 }
 
 .tabs {
@@ -439,6 +577,21 @@ th {
   color: var(--ink-muted);
   font-size: var(--text-sm);
   font-weight: 500;
+}
+
+.sort-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sort-button:hover,
+.sort-active {
+  color: var(--ink);
 }
 
 td input,

@@ -20,20 +20,27 @@ const COLUMNS = `
   e.equipment_id, e.inventory_number, e.name, e.equipment_type_id, e.parent_equipment_id,
   e.assigned_user_id, e.tree_path, e.affected_people,
   t.name AS type_name, u.full_name AS assigned_user_name,
-  ${PROPOSED_PEOPLE} AS proposed_people`;
+  ${PROPOSED_PEOPLE} AS proposed_people,
+  e.department_id, d.department_id AS root_department_id, d.name AS department_name`;
 
+//підрозділ береться від кореня піддерева
 const FROM = `
   FROM equipment e
   JOIN equipment_types t USING (equipment_type_id)
-  LEFT JOIN users u ON u.user_id = e.assigned_user_id`;
+  LEFT JOIN users u ON u.user_id = e.assigned_user_id
+  LEFT JOIN equipment root ON root.equipment_id = NULLIF(split_part(e.tree_path, '.', 2), '')::int
+  LEFT JOIN departments d ON d.department_id = root.department_id`;
+
+//обладнання e видно працівнику $1, якщо воно в піддереві закріпленого за ним
+//або спільного, яким він користується (equipment_consumers)
+const VISIBLE_TO_USER = `EXISTS (
+  SELECT 1 FROM equipment o
+   WHERE e.tree_path LIKE o.tree_path || '%'
+     AND (o.assigned_user_id = $1
+          OR EXISTS (SELECT 1 FROM equipment_consumers c WHERE c.equipment_id = o.equipment_id AND c.user_id = $1)))`;
 
 function listByUser(db, userId) {
-  return db(
-    `SELECT ${COLUMNS} ${FROM}
-      WHERE EXISTS (SELECT 1 FROM equipment o WHERE o.assigned_user_id = $1 AND e.tree_path LIKE o.tree_path || '%')
-      ${TREE_ORDER}`,
-    [userId]
-  );
+  return db(`SELECT ${COLUMNS} ${FROM} WHERE ${VISIBLE_TO_USER} ${TREE_ORDER}`, [userId]);
 }
 
 function listAll(db) {
@@ -45,18 +52,18 @@ function listAll(db) {
 }
 
 async function canSee(db, userId, equipmentId) {
-  const rows = await db(
-    `SELECT 1 FROM equipment target
-       JOIN equipment owned ON target.tree_path LIKE owned.tree_path || '%'
-      WHERE target.equipment_id = $1 AND owned.assigned_user_id = $2`,
-    [equipmentId, userId]
-  );
+  const rows = await db(`SELECT 1 FROM equipment e WHERE e.equipment_id = $2 AND ${VISIBLE_TO_USER}`, [userId, equipmentId]);
   return rows.length > 0;
 }
 
 async function peopleCount(db, equipmentId) {
   const [row] = await db(`SELECT ${PEOPLE_SQL} AS n FROM equipment e WHERE e.equipment_id = $1`, [equipmentId]);
   return row.n;
+}
+
+async function findIdentity(db, equipmentId) {
+  const [row] = await db('SELECT tree_path, name, inventory_number FROM equipment WHERE equipment_id = $1', [equipmentId]);
+  return row ?? null;
 }
 
 async function findPath(db, equipmentId) {
@@ -66,9 +73,9 @@ async function findPath(db, equipmentId) {
 
 async function insertEquipment(db, input) {
   const [row] = await db(
-    `INSERT INTO equipment (inventory_number, name, equipment_type_id, parent_equipment_id, assigned_user_id, affected_people)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING equipment_id`,
-    [input.inventoryNumber, input.name, input.equipmentTypeId, input.parentEquipmentId, input.assignedUserId, input.affectedPeople]
+    `INSERT INTO equipment (inventory_number, name, equipment_type_id, parent_equipment_id, assigned_user_id, affected_people, department_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING equipment_id`,
+    [input.inventoryNumber, input.name, input.equipmentTypeId, input.parentEquipmentId, input.assignedUserId, input.affectedPeople, input.departmentId]
   );
   return row.equipment_id;
 }
@@ -77,13 +84,13 @@ function setPath(db, equipmentId, path) {
   return db('UPDATE equipment SET tree_path = $2 WHERE equipment_id = $1', [equipmentId, path]);
 }
 
+//назва та інвентарний номер не змінюються
 function updateEquipment(db, equipmentId, input) {
   return db(
     `UPDATE equipment
-        SET inventory_number = $2, name = $3, equipment_type_id = $4, parent_equipment_id = $5,
-            assigned_user_id = $6, affected_people = $7
+        SET equipment_type_id = $2, parent_equipment_id = $3, assigned_user_id = $4, affected_people = $5, department_id = $6
       WHERE equipment_id = $1`,
-    [equipmentId, input.inventoryNumber, input.name, input.equipmentTypeId, input.parentEquipmentId, input.assignedUserId, input.affectedPeople]
+    [equipmentId, input.equipmentTypeId, input.parentEquipmentId, input.assignedUserId, input.affectedPeople, input.departmentId]
   );
 }
 
@@ -118,6 +125,7 @@ module.exports = {
   listAll,
   canSee,
   peopleCount,
+  findIdentity,
   findPath,
   insertEquipment,
   setPath,

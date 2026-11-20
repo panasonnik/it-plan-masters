@@ -5,6 +5,7 @@ const { query } = require('./db');
 const { replanToday, dateOf } = require('./modules/plan/plan.service');
 const { PEOPLE_SQL } = require('./modules/equipment/equipment.repository');
 const { NORM_SQL } = require('./modules/references/references.repository');
+const { logTaskEvent } = require('./modules/notifications/notifications.repository');
 
 const RECIPIENTS = `
   SELECT e.assigned_user_id AS user_id FROM equipment e WHERE e.equipment_id = t.equipment_id AND e.assigned_user_id IS NOT NULL
@@ -30,12 +31,13 @@ async function createPlannedTasks() {
 
   await query(
     `INSERT INTO notifications (user_id, type, task_id, title, body)
-     SELECT p.user_id, 'MAINTENANCE_PLANNED', t.task_id, 'Заплановано обслуговування: ' || e.name,
+     SELECT p.user_id, 'MAINTENANCE_PLANNED', t.task_id, 'Заплановано: ' || wt.name || ' · ' || e.name,
             'Роботи виконають між ' || to_char(t.release_at, 'DD.MM') || ' і ' || to_char(t.due_at - interval '1 day', 'DD.MM') || '.'
-       FROM tasks t JOIN equipment e USING (equipment_id), LATERAL (${RECIPIENTS}) p
+       FROM tasks t JOIN equipment e USING (equipment_id) JOIN work_types wt USING (work_type), LATERAL (${RECIPIENTS}) p
       WHERE t.task_id = ANY($1)`,
     [created.map((row) => row.task_id)]
   );
+  await logTaskEvent(query, created.map((row) => row.task_id), 'MAINTENANCE_PLANNED', 'Створено планову роботу');
 
   return `planned tasks created: ${created.length}`;
 }
@@ -43,10 +45,11 @@ async function createPlannedTasks() {
 async function remindMaintenance() {
   const rows = await query(
     `INSERT INTO notifications (user_id, type, task_id, title, body)
-     SELECT p.user_id, 'MAINTENANCE_SOON', t.task_id, 'Найближчим часом обслуговування: ' || e.name,
+     SELECT p.user_id, 'MAINTENANCE_SOON', t.task_id, 'Найближчим часом: ' || wt.name || ' · ' || e.name,
             'Заплановано на ' || to_char(COALESCE(pi.planned_start_at, t.release_at), 'DD.MM') || '.'
        FROM tasks t
        JOIN equipment e USING (equipment_id)
+       JOIN work_types wt USING (work_type)
        LEFT JOIN plan_items pi ON pi.task_id = t.task_id,
        LATERAL (${RECIPIENTS}) p
       WHERE t.source = 'PLANNED' AND t.status IN ('NEW', 'SCHEDULED')

@@ -49,7 +49,7 @@ export default function ReportPage() {
   };
 
   return (
-    <Page title="Втрати робочого часу" hint="Скільки робочого часу люди втратили, поки чекали на ремонт і обслуговування.">
+    <Page title="Втрати робочого часу" hint="Скільки робочого часу люди втратили, поки чекали на ремонт і планові роботи.">
       <div className="inline-form">
         <label>
           З <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -82,7 +82,7 @@ export default function ReportPage() {
               <td>{data.works}</td>
             </tr>
             <tr>
-              <th>Втрати Z, людино-хвилин</th>
+              <th>Втрати, людино-хвилин</th>
               <td>
                 {data.z} ({hours(data.z)})
               </td>
@@ -92,11 +92,11 @@ export default function ReportPage() {
               <td>{data.zUnplanned}</td>
             </tr>
             <tr>
-              <th>з них через прострочене обслуговування</th>
+              <th>з них через прострочені планові роботи</th>
               <td>{data.zPlanned}</td>
             </tr>
             <tr>
-              <th>Простій одного працівника S, хвилин (працівників: {data.employees})</th>
+              <th>Простій одного працівника, хвилин (працівників: {data.employees})</th>
               <td>{data.s ?? '—'}</td>
             </tr>
           </tbody>

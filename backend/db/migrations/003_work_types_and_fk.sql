@@ -5,22 +5,22 @@ CREATE TABLE work_types (
     CONSTRAINT pk_work_types PRIMARY KEY (work_type)
 );
 
---види робіт з наявних даних
-INSERT INTO work_types (work_type, name)
-SELECT DISTINCT used.work_type,
-       CASE used.work_type
-           WHEN 'DIAGNOSTICS' THEN 'Діагностика'
-           WHEN 'REPAIR' THEN 'Ремонт'
-           WHEN 'REPLACEMENT' THEN 'Заміна'
-           WHEN 'MAINTENANCE' THEN 'Технічне обслуговування'
-           WHEN 'CLEANING' THEN 'Чищення'
-           WHEN 'SOFTWARE' THEN 'Програмне забезпечення'
-           ELSE used.work_type
-       END
-  FROM (SELECT work_type FROM symptoms
-        UNION ALL SELECT work_type FROM service_norms
-        UNION ALL SELECT work_type FROM maintenance_rules
-        UNION ALL SELECT work_type FROM tasks) used;
+--код, якого тут немає, зупинить міграцію на зовнішньому ключі нижче
+INSERT INTO work_types (work_type, name) VALUES
+  ('DIAGNOSTICS', 'Діагностика несправності'),
+  ('REPAIR', 'Ремонт'),
+  ('REPLACEMENT', 'Заміна комплектуючих (диск, блок живлення, оперативна пам''ять)'),
+  ('DUST_CLEANING', 'Очищення системного блока від пилу, заміна термопасти'),
+  ('VIRUS_REMOVAL', 'Перевірка на віруси та їх видалення'),
+  ('SOFTWARE_INSTALL', 'Встановлення та налаштування програм'),
+  ('OS_UPDATE', 'Встановлення оновлень Windows'),
+  ('LICENSE_CHECK', 'Перевірка ліцензійності встановлених програм'),
+  ('DEFRAG', 'Дефрагментація жорсткого диска (лише HDD)'),
+  ('DISK_CHECK', 'Перевірка стану диска (S.M.A.R.T.)'),
+  ('TEMP_FILES', 'Видалення тимчасових файлів і перевірка вільного місця на диску'),
+  ('BACKUP', 'Резервне копіювання даних сервера та перевірка копій'),
+  ('PRINTER_SERVICE', 'Профілактика принтера (видалення тонерного пилу, перевірка роликів подачі паперу)'),
+  ('NETWORK_CHECK', 'Перевірка комутатора та оновлення прошивки');
 
 ALTER TABLE symptoms
     ADD CONSTRAINT fk_symptoms_work_type FOREIGN KEY (work_type) REFERENCES work_types (work_type) ON UPDATE CASCADE;

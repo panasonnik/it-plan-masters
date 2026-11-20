@@ -18,6 +18,18 @@ function errorHandler(err, req, res, next) {
     return res.status(err.status).json({ error: err.message });
   }
 
+  if (err.constraint === 'uq_equipment_inventory_number') {
+    return res.status(409).json({ error: 'Обладнання з таким інвентарним номером уже існує' });
+  }
+  if (err.constraint === 'ck_equipment_inventory_number') {
+    return res.status(422).json({ error: 'Інвентарний номер має містити лише цифри' });
+  }
+  if (err.constraint === 'fk_equipment_department' && err.code === '23503' && !String(err.detail).includes('is not present')) {
+    return res.status(409).json({ error: 'До підрозділу прив’язане обладнання — спершу перенесіть його в інший підрозділ' });
+  }
+  if (err.constraint === 'uq_departments_name') {
+    return res.status(409).json({ error: 'Підрозділ з такою назвою вже є' });
+  }
   if (err.code === '23505') {
     return res.status(409).json({ error: 'Такий запис уже існує' });
   }

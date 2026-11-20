@@ -4,12 +4,21 @@ import { ErrorText, Page, useLoad } from '../ui';
 import type { Equipment, Row } from '../types';
 import UsersTab from './UsersTab';
 import WorkHoursTab from './WorkHoursTab';
+import SettingsTab from './SettingsTab';
 
 interface Column {
   key: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'readonly';
   options?: [string | number, string][];
+  //що показати замість порожнього значення
+  emptyLabel?: string;
+  sortable?: boolean;
+}
+
+interface Sort {
+  key: string;
+  descending: boolean;
 }
 
 interface TableConfig {
@@ -19,6 +28,9 @@ interface TableConfig {
   canAdd: boolean;
   //лише перегляд і додавання
   addOnly?: boolean;
+  defaultSort?: string;
+  intro?: string;
+  addLabel?: string;
 }
 
 export default function ReferencesPage() {
@@ -36,10 +48,18 @@ export default function ReferencesPage() {
       name: 'symptoms',
       key: 'symptom_id',
       canAdd: true,
+      defaultSort: 'equipment_type_id',
       columns: [
-        { key: 'label', label: 'Що сталося', type: 'text' },
-        { key: 'equipment_type_id', label: 'Тип обладнання (порожньо — для всіх)', type: 'select', options: typeOptions },
-        { key: 'work_type', label: 'Вид робіт', type: 'select', options: workTypeOptions },
+        {
+          key: 'equipment_type_id',
+          label: 'Обладнання',
+          type: 'select',
+          options: typeOptions,
+          emptyLabel: 'Усі типи',
+          sortable: true,
+        },
+        { key: 'label', label: 'Що сталося', type: 'text', sortable: true },
+        { key: 'work_type', label: 'Вид робіт', type: 'select', options: workTypeOptions, sortable: true },
       ],
     },
     norms: {
@@ -60,11 +80,21 @@ export default function ReferencesPage() {
       canAdd: true,
       columns: [
         { key: 'equipment_id', label: 'Обладнання', type: 'select', options: equipmentOptions },
-        { key: 'work_type', label: 'Вид робіт', type: 'select', options: workTypeOptions },
-        { key: 'period_days', label: 'Кожні, днів', type: 'number' },
-        { key: 'tolerance_days', label: 'Допуск ±, днів', type: 'number' },
-        { key: 'next_due_date', label: 'Наступна дата', type: 'date' },
+        { key: 'work_type', label: 'Що зробити', type: 'select', options: workTypeOptions },
+        { key: 'period_days', label: 'Повторювати кожні, днів', type: 'number' },
+        { key: 'tolerance_days', label: 'Можна виконати раніше або пізніше, на ± днів', type: 'number' },
+        { key: 'next_due_date', label: 'Наступного разу', type: 'date' },
       ],
+      intro: 'Як часто повторювати планові роботи. Після виконання наступна дата зсувається на вказану кількість днів.',
+      addLabel: '+ Додати планову роботу',
+    },
+    departments: {
+      name: 'departments',
+      key: 'department_id',
+      canAdd: true,
+      columns: [{ key: 'name', label: 'Назва підрозділу', type: 'text' }],
+      intro: 'Підрозділ задають кореневому обладнанню на сторінці «Обладнання». Він потрібен лише для відображення дерева.',
+      addLabel: '+ Додати підрозділ',
     },
     workTypes: {
       name: 'work-types',
@@ -76,21 +106,13 @@ export default function ReferencesPage() {
         { key: 'name', label: 'Назва', type: 'text' },
       ],
     },
-    settings: {
-      name: 'settings',
-      key: 'setting_key',
-      canAdd: false,
-      columns: [
-        { key: 'description', label: 'Налаштування', type: 'readonly' },
-        { key: 'setting_value', label: 'Значення', type: 'text' },
-      ],
-    },
   };
 
   const tabs: [string, string][] = [
     ['symptoms', 'Симптоми'],
     ['norms', 'Нормативи'],
-    ['rules', 'Регламенти обслуговування'],
+    ['rules', 'Графік планових робіт'],
+    ['departments', 'Підрозділи'],
     ['workTypes', 'Види робіт'],
     ['hours', 'Робочий час'],
     ['users', 'Користувачі'],
@@ -108,6 +130,7 @@ export default function ReferencesPage() {
       </nav>
       {tab === 'hours' && <WorkHoursTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'settings' && <SettingsTab />}
       {tables[tab] && <ReferenceTable key={tab} config={tables[tab]} onSaved={workTypes.reload} />}
     </Page>
   );
@@ -118,6 +141,7 @@ function ReferenceTable({ config, onSaved }: { config: TableConfig; onSaved: () 
   const [editing, setEditing] = useState<Row | null>(null);
   const [actionError, setActionError] = useState('');
   const [editError, setEditError] = useState('');
+  const [sort, setSort] = useState<Sort | null>(config.defaultSort ? { key: config.defaultSort, descending: false } : null);
 
   const editable = config.columns.filter((column) => column.type !== 'readonly');
   const [isNew, setIsNew] = useState(false);
@@ -154,7 +178,24 @@ function ReferenceTable({ config, onSaved }: { config: TableConfig; onSaved: () 
   function show(column: Column, row: Row) {
     const value = row[column.key];
     if (column.type === 'date' && value) return String(value).slice(0, 10);
-    return column.options?.find(([code]) => String(code) === String(value))?.[1] ?? value ?? '—';
+    return column.options?.find(([code]) => String(code) === String(value))?.[1] ?? value ?? column.emptyLabel ?? '—';
+  }
+
+  function toggleSort(key: string) {
+    setSort(sort?.key === key ? { key, descending: !sort.descending } : { key, descending: false });
+  }
+
+  //порожні значення — на початку; рівні зберігають порядок із сервера
+  function sorted(rows: Row[]): Row[] {
+    const column = config.columns.find((c) => c.key === sort?.key);
+    if (!sort || !column) return rows;
+
+    const valueOf = (row: Row) => (row[column.key] === null || row[column.key] === '' ? null : String(show(column, row)));
+    return [...rows].sort((a, b) => {
+      const [left, right] = [valueOf(a), valueOf(b)];
+      const order = left === right ? 0 : left === null ? -1 : right === null ? 1 : left.localeCompare(right, 'uk', { numeric: true });
+      return sort.descending ? -order : order;
+    });
   }
 
   function input(column: Column) {
@@ -165,7 +206,7 @@ function ReferenceTable({ config, onSaved }: { config: TableConfig; onSaved: () 
 
     return (
       <select value={value} onChange={(e) => change(e.target.value)}>
-        <option value="">—</option>
+        <option value="">{column.emptyLabel ?? '—'}</option>
         {column.options?.map(([code, label]) => (
           <option key={code} value={code}>
             {label}
@@ -175,17 +216,34 @@ function ReferenceTable({ config, onSaved }: { config: TableConfig; onSaved: () 
     );
   }
 
-  const rows = isNew ? [...(data ?? []), editing!] : (data ?? []);
+  const rows = isNew ? [...sorted(data ?? []), editing!] : sorted(data ?? []);
 
   return (
     <>
+      {config.intro && <p className="muted">{config.intro}</p>}
       <ErrorText text={error || actionError} />
       <table>
         <thead>
           <tr>
-            {config.columns.map((column) => (
-              <th key={column.key}>{column.label}</th>
-            ))}
+            {config.columns.map((column) => {
+              const active = sort?.key === column.key;
+              return (
+                <th key={column.key} aria-sort={active ? (sort.descending ? 'descending' : 'ascending') : undefined}>
+                  {column.sortable ? (
+                    <button
+                      type="button"
+                      className={`sort-button${active ? ' sort-active' : ''}`}
+                      title="Сортувати"
+                      onClick={() => toggleSort(column.key)}
+                    >
+                      {column.label} {active ? (sort.descending ? '▼' : '▲') : '↕'}
+                    </button>
+                  ) : (
+                    column.label
+                  )}
+                </th>
+              );
+            })}
             <th />
           </tr>
         </thead>
@@ -230,7 +288,7 @@ function ReferenceTable({ config, onSaved }: { config: TableConfig; onSaved: () 
       </table>
       {config.canAdd && !isNew && (
         <button type="button" className="button" onClick={() => edit({}, true)}>
-          + Додати
+          {config.addLabel ?? '+ Додати'}
         </button>
       )}
     </>

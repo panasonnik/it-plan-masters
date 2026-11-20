@@ -20,6 +20,11 @@ const TABLES = {
     key: 'maintenance_rule_id',
     fields: { equipment_id: 'id', work_type: 'workType', period_days: 'minutes', tolerance_days: 'days', next_due_date: 'date' },
   },
+  departments: {
+    table: 'departments',
+    key: 'department_id',
+    fields: { name: 'text' },
+  },
 };
 
 function tableOf(name) {

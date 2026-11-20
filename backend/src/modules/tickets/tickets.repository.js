@@ -14,8 +14,15 @@ const FROM = `
   LEFT JOIN tasks t ON t.ticket_id = tk.ticket_id
   LEFT JOIN work_types wt ON wt.work_type = t.work_type`;
 
+//власні заявки і заявки на закріплене обладнання (зокрема подані адміністратором)
 function listByUser(db, userId) {
-  return db(`SELECT ${COLUMNS} ${FROM} WHERE tk.reported_by_user_id = $1 ORDER BY tk.ticket_id DESC`, [userId]);
+  return db(
+    `SELECT ${COLUMNS} ${FROM}
+      WHERE tk.reported_by_user_id = $1
+         OR EXISTS (SELECT 1 FROM equipment o WHERE o.assigned_user_id = $1 AND e.tree_path LIKE o.tree_path || '%')
+      ORDER BY tk.ticket_id DESC`,
+    [userId]
+  );
 }
 
 function listAll(db) {
@@ -23,7 +30,7 @@ function listAll(db) {
 }
 
 async function findSymptom(db, symptomId) {
-  const [symptom] = await db('SELECT work_type FROM symptoms WHERE symptom_id = $1', [symptomId]);
+  const [symptom] = await db('SELECT work_type, label FROM symptoms WHERE symptom_id = $1', [symptomId]);
   return symptom;
 }
 

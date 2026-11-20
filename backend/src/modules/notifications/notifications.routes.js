@@ -11,6 +11,11 @@ router.get('/', async (req, res) => {
   res.json(await service.listMine(req.user.userId));
 });
 
+router.post('/read-all', async (req, res) => {
+  await service.markAllRead(req.user.userId);
+  res.status(204).end();
+});
+
 router.post('/:notificationId/read', async (req, res) => {
   await service.markRead(Number(req.params.notificationId), req.user.userId);
   res.status(204).end();

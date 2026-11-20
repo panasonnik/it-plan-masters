@@ -23,6 +23,15 @@ export interface Equipment {
   type_name: string;
   assigned_user_name: string | null;
   consumer_ids?: number[];
+  //власний підрозділ (лише корінь) і підрозділ кореня піддерева
+  department_id: number | null;
+  root_department_id: number | null;
+  department_name: string | null;
+}
+
+export interface Department {
+  department_id: number;
+  name: string;
 }
 
 export interface HistoryRow {
@@ -40,6 +49,7 @@ export interface Ticket {
   equipment_name: string;
   inventory_number: string;
   symptom_label: string;
+  reported_by_user_id: number;
   reported_by_name: string;
   work_type: string | null;
   work_type_name: string | null;

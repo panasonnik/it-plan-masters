@@ -2,9 +2,9 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { api } from '../api';
 import { EquipmentTree, ErrorText, Page, useLoad } from '../ui';
-import type { Equipment, Row, User } from '../types';
+import type { Department, Equipment, Row, User } from '../types';
 
-const EMPTY = { inventoryNumber: '', name: '', equipmentTypeId: '', parentEquipmentId: '', assignedUserId: '', affectedPeople: '' };
+const EMPTY = { inventoryNumber: '', name: '', equipmentTypeId: '', parentEquipmentId: '', assignedUserId: '', affectedPeople: '', departmentId: '' };
 
 function formOf(item: Equipment) {
   return {
@@ -14,6 +14,7 @@ function formOf(item: Equipment) {
     parentEquipmentId: String(item.parent_equipment_id ?? ''),
     assignedUserId: String(item.assigned_user_id ?? ''),
     affectedPeople: String(item.affected_people ?? ''),
+    departmentId: String(item.department_id ?? ''),
   };
 }
 
@@ -21,6 +22,7 @@ export default function EquipmentPage() {
   const equipment = useLoad<Equipment[]>('/equipment');
   const types = useLoad<Row[]>('/references/equipment-types');
   const users = useLoad<User[]>('/users');
+  const departments = useLoad<Department[]>('/references/departments');
   const [selected, setSelected] = useState<Equipment | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
@@ -48,6 +50,8 @@ export default function EquipmentPage() {
       parentEquipmentId: form.parentEquipmentId || null,
       assignedUserId: form.assignedUserId || null,
       affectedPeople: form.affectedPeople || null,
+      //підрозділ — лише для кореневого обладнання
+      departmentId: (!form.parentEquipmentId && form.departmentId) || null,
     };
     run(() => (selected ? api('PATCH', `/equipment/${selected.equipment_id}`, body) : api('POST', '/equipment', body)));
   }
@@ -57,7 +61,17 @@ export default function EquipmentPage() {
   const field = (name: keyof typeof EMPTY, label: string, options?: [string | number, string][]) => (
     <label>
       {label}
-      {options ? (
+      {name === 'inventoryNumber' || name === 'name' ? (
+        <input
+          value={form[name]}
+          readOnly={current !== null}
+          title={current ? 'Не змінюється після створення' : undefined}
+          inputMode={name === 'inventoryNumber' ? 'numeric' : undefined}
+          onChange={(e) =>
+            setForm({ ...form, [name]: name === 'inventoryNumber' ? e.target.value.replace(/\D/g, '') : e.target.value })
+          }
+        />
+      ) : options ? (
         <select value={form[name]} onChange={(e) => setForm({ ...form, [name]: e.target.value })}>
           <option value="">—</option>
           {options.map(([value, text]) => (
@@ -85,10 +99,14 @@ export default function EquipmentPage() {
         <div className="split-side">
           <form className="form" onSubmit={save}>
             <h3 className="panel-title">{current ? current.name : 'Нове обладнання'}</h3>
-            {field('inventoryNumber', 'Інвентарний номер')}
+            {field('inventoryNumber', 'Інвентарний номер (лише цифри)')}
             {field('name', 'Назва')}
+            {current && <p className="muted">Назва та інвентарний номер не змінюються після створення.</p>}
             {field('equipmentTypeId', 'Тип', types.data?.map((t) => [t.equipment_type_id as number, t.name as string]))}
-            {field('parentEquipmentId', 'Входить до складу', equipment.data?.map((e) => [e.equipment_id, e.name]))}
+            {field('parentEquipmentId', 'Входить до складу', equipment.data?.map((e) => [e.equipment_id, `${e.name} (${e.inventory_number})`]))}
+            {form.parentEquipmentId
+              ? <p className="muted">Підрозділ визначає обладнання, до складу якого входить ця одиниця.</p>
+              : field('departmentId', 'Підрозділ', departments.data?.map((d) => [d.department_id, d.name]))}
             {field('assignedUserId', 'Закріплено за працівником', users.data?.map((u) => [u.user_id, u.full_name]))}
             {current && <p className="muted">Система пропонує кількість людей: {current.proposed_people}</p>}
             {field('affectedPeople', 'Кількість людей (порожньо — як пропонує система)')}
